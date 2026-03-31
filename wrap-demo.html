@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pretext 文字环绕排版 Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    h1 {
+      text-align: center;
+      font-size: 28px;
+      margin-bottom: 6px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .subtitle { text-align: center; color: #666; font-size: 13px; margin-bottom: 32px; }
+    .main-canvas-wrap {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    canvas { display: block; }
+
+    /* Controls */
+    .controls {
+      max-width: 900px;
+      margin: 24px auto 0;
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #141414;
+      border: 1px solid #222;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+    }
+    .control-group label { color: #888; white-space: nowrap; }
+    .control-group input[type=range] { width: 120px; accent-color: #667eea; }
+    .control-group select, .control-group input[type=color] {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #e0e0e0;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .val { color: #667eea; font-weight: 600; min-width: 32px; }
+
+    /* Info bar */
+    .info-bar {
+      max-width: 900px;
+      margin: 16px auto 0;
+      display: flex;
+      gap: 24px;
+      justify-content: center;
+      font-size: 12px;
+      color: #555;
+    }
+    .info-bar span b { color: #667eea; }
+  </style>
+</head>
+<body>
+
+<h1>Pretext 文字环绕图片排版</h1>
+<p class="subtitle">layoutNextLine() · 拖动控制条调整图片位置和大小 · 纯 Canvas 渲染</p>
+
+<div class="main-canvas-wrap">
+  <canvas id="mainCanvas"></canvas>
+</div>
+
+<div class="controls">
+  <div class="control-group">
+    <label>图片 X</label>
+    <input type="range" id="imgX" min="20" max="600" value="60">
+    <span class="val" id="imgXVal">60</span>
+  </div>
+  <div class="control-group">
+    <label>图片 Y</label>
+    <input type="range" id="imgY" min="20" max="400" value="40">
+    <span class="val" id="imgYVal">40</span>
+  </div>
+  <div class="control-group">
+    <label>图片宽度</label>
+    <input type="range" id="imgW" min="80" max="400" value="200">
+    <span class="val" id="imgWVal">200</span>
+  </div>
+  <div class="control-group">
+    <label>图片高度</label>
+    <input type="range" id="imgH" min="80" max="400" value="180">
+    <span class="val" id="imgHVal">180</span>
+  </div>
+  <div class="control-group">
+    <label>排列方式</label>
+    <select id="floatDir">
+      <option value="left">左浮动</option>
+      <option value="right">右浮动</option>
+    </select>
+  </div>
+</div>
+
+<div class="info-bar">
+  <span>排版耗时: <b id="infoTime">-</b></span>
+  <span>总行数: <b id="infoLines">-</b></span>
+  <span>总高度: <b id="infoHeight">-</b></span>
+  <span>环绕行数: <b id="infoWrap">-</b></span>
+</div>
+
+<script type="module">
+import { prepareWithSegments, layoutNextLine, layout } from 'https://esm.sh/@chenglou/pretext'
+
+const canvas = document.getElementById('mainCanvas')
+const ctx = canvas.getContext('2d')
+const FONT = '15px Inter, -apple-system, sans-serif'
+const LINE_H = 24
+const PAD = 24
+const GAP = 10
+
+const article = `Pretext 是一个革命性的文本排版引擎，由 Midjourney 前端工程师 Cheng Lou 创建。它用纯 TypeScript 在用户态实现了一套高精度的文本测量系统，完全绕过了浏览器的 DOM Reflow 机制。
+
+这个项目的核心突破在于：Cheng Lou 发现浏览器的 canvas.measureText() 和 DOM 渲染底层使用同一套字体引擎，但 canvas 完全在布局树之外运行，量多少次字都不会触发 Reflow。于是 Pretext 先用 canvas 把每个文字片段量一遍、缓存宽度，之后不管怎么拉伸窗口、切换布局，排版计算全是加减乘除。
+
+在性能方面，Chrome 上 Pretext 的 layout() 耗时仅 0.09 毫秒，而传统 DOM 交错测量耗时 43.50 毫秒，快了 483 倍。Safari 上更夸张，快了超 1242 倍。7680 项穷举测试，三大浏览器全部像素级吻合。
+
+除了性能，Pretext 还解锁了许多此前在 Web 上"不可能"的排版能力：文字围绕任意形状流动、多行文本收缩包裹、动态响应式多栏杂志布局、聊天气泡自适应宽度等。这些曾经是 CSS 的噩梦，如今在 Pretext 面前都不值一提。
+
+Cheng Lou 的履历几乎串起了半部前端进化史。作为 React Motion 的创造者、ReasonML 和 ReScript 语言的缔造者、Facebook Messenger 前端的核心架构师，他如今在 Midjourney 用 Bun 撑起了整个 UI 体系。Pretext 这个只有 15KB 的引擎，预示着网页 UI 将从传统的 CSS 束缚中解脱，迈向更具想象力的 Canvas 和 GPU 渲染时代。`
+
+// 装饰用的"图片"（渐变矩形 + 标题）
+function drawImageBlock(x, y, w, h) {
+  // 渐变背景
+  const grad = ctx.createLinearGradient(x, y, x + w, y + h)
+  grad.addColorStop(0, '#2a1a4e')
+  grad.addColorStop(0.5, '#1a3a5e')
+  grad.addColorStop(1, '#2a1a4e')
+  ctx.fillStyle = grad
+  ctx.beginPath()
+  ctx.roundRect(x, y, w, h, 8)
+  ctx.fill()
+
+  // 边框
+  ctx.strokeStyle = '#667eea'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.roundRect(x, y, w, h, 8)
+  ctx.stroke()
+
+  // 图标
+  ctx.font = `${Math.min(w, h) * 0.3}px sans-serif`
+  ctx.textAlign = 'center'
+  ctx.fillStyle = 'rgba(255,255,255,0.15)'
+  ctx.fillText('🖼️', x + w / 2, y + h / 2 + Math.min(w, h) * 0.1)
+
+  // 标签
+  ctx.font = 'bold 11px Inter, sans-serif'
+  ctx.fillStyle = '#667eea'
+  ctx.fillText('FLOAT IMAGE', x + w / 2, y + h / 2 + Math.min(w, h) * 0.1 + 24)
+
+  // 尺寸标注
+  ctx.font = '10px monospace'
+  ctx.fillStyle = 'rgba(255,255,255,0.3)'
+  ctx.fillText(`${w}×${h}`, x + w / 2, y + h - 10)
+
+  ctx.textAlign = 'left'
+}
+
+function render() {
+  const imgX = +document.getElementById('imgX').value
+  const imgY = +document.getElementById('imgY').value
+  const imgW = +document.getElementById('imgW').value
+  const imgH = +document.getElementById('imgH').value
+  const floatDir = document.getElementById('floatDir').value
+
+  const CW = 860
+  canvas.width = CW
+  const t0 = performance.now()
+
+  // 准备文本
+  const paragraphs = article.split('\n\n').filter(Boolean)
+  const preparedParagraphs = paragraphs.map(p => prepareWithSegments(p, FONT))
+
+  // 布局计算
+  const lines = []
+  let curY = PAD
+
+  // 图片边界（含间距）
+  const imgLeft = floatDir === 'left' ? imgX - GAP : 0
+  const imgRight = floatDir === 'left' ? CW - PAD : imgX + imgW + GAP
+  const imgTop = imgY
+  const imgBottom = imgY + imgH + GAP
+  const imgActualLeft = imgX - GAP
+  const imgActualRight = imgX + imgW + GAP
+
+  let wrapLines = 0
+
+  for (let pi = 0; pi < preparedParagraphs.length; pi++) {
+    let cursor = { segmentIndex: 0, graphemeIndex: 0 }
+
+    while (cursor) {
+      // 计算当前行可用宽度
+      let lineStart = PAD
+      let lineEnd = CW - PAD
+
+      if (curY >= imgTop && curY < imgBottom) {
+        // 在图片高度范围内
+        if (floatDir === 'left') {
+          lineStart = Math.max(lineStart, imgActualRight)
+        } else {
+          lineEnd = Math.min(lineEnd, imgActualLeft)
+        }
+        wrapLines++
+      }
+
+      const availWidth = lineEnd - lineStart
+      if (availWidth < 30) {
+        curY += LINE_H
+        continue
+      }
+
+      const line = layoutNextLine(preparedParagraphs[pi], cursor, availWidth)
+      if (!line) break
+
+      lines.push({
+        text: line.text,
+        x: lineStart,
+        y: curY,
+        width: line.width,
+        paragraphIndex: pi
+      })
+      cursor = line.end
+      curY += LINE_H
+    }
+
+    // 段落间距
+    curY += LINE_H * 0.6
+  }
+
+  const totalHeight = curY + PAD
+  canvas.height = totalHeight
+
+  // 绘制背景
+  ctx.fillStyle = '#111'
+  ctx.fillRect(0, 0, CW, totalHeight)
+
+  // 绘制图片
+  drawImageBlock(imgX, imgY, imgW, imgH)
+
+  // 绘制文本行
+  ctx.font = FONT
+  const colors = ['#e0e0e0', '#d0d0d0', '#c8c8c8', '#d4d4d4', '#cccccc']
+
+  lines.forEach(line => {
+    const inWrapZone = line.y >= imgTop && line.y < imgBottom
+    ctx.fillStyle = inWrapZone ? '#b8b8ff' : colors[line.paragraphIndex % colors.length]
+    ctx.fillText(line.text, line.x, line.y + LINE_H - 5)
+  })
+
+  // 画辅助线：图片浮动区域边界
+  ctx.setLineDash([3, 6])
+  ctx.strokeStyle = 'rgba(102, 126, 234, 0.2)'
+  ctx.lineWidth = 1
+  if (floatDir === 'left') {
+    ctx.beginPath()
+    ctx.moveTo(imgActualRight, imgTop)
+    ctx.lineTo(imgActualRight, imgBottom)
+    ctx.stroke()
+  } else {
+    ctx.beginPath()
+    ctx.moveTo(imgActualLeft, imgTop)
+    ctx.lineTo(imgActualLeft, imgBottom)
+    ctx.stroke()
+  }
+  ctx.setLineDash([])
+
+  const elapsed = (performance.now() - t0).toFixed(2)
+  document.getElementById('infoTime').textContent = elapsed + 'ms'
+  document.getElementById('infoLines').textContent = lines.length
+  document.getElementById('infoHeight').textContent = totalHeight + 'px'
+  document.getElementById('infoWrap').textContent = wrapLines
+}
+
+// Bind controls
+['imgX', 'imgY', 'imgW', 'imgH'].forEach(id => {
+  const el = document.getElementById(id)
+  const valEl = document.getElementById(id + 'Val')
+  el.addEventListener('input', () => {
+    valEl.textContent = el.value
+    render()
+  })
+})
+document.getElementById('floatDir').addEventListener('change', render)
+
+// Initial render
+render()
+</script>
+</body>
+</html>

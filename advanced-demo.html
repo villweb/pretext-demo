@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pretext 高级排版 Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: #060608;
+      color: #e0e0e0;
+      overflow-x: hidden;
+    }
+    .hero {
+      text-align: center;
+      padding: 48px 20px 32px;
+      background: linear-gradient(180deg, #0e0e18 0%, #060608 100%);
+    }
+    .hero h1 {
+      font-size: 36px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #667eea 0%, #a855f7 50%, #ec4899 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.5px;
+    }
+    .hero p { color: #555; font-size: 14px; margin-top: 8px; }
+    .hero .tags { margin-top: 12px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .hero .tag {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      border: 1px solid #222;
+      color: #888;
+      background: #0e0e12;
+    }
+
+    .section {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 32px 20px;
+    }
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: #fff;
+    }
+    .section-desc {
+      font-size: 13px;
+      color: #555;
+      margin-bottom: 20px;
+    }
+    .canvas-wrap {
+      background: #0c0c10;
+      border: 1px solid #1a1a22;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+    canvas { display: block; }
+
+    /* Controls bar */
+    .ctrl-bar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .ctrl {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #0e0e14;
+      border: 1px solid #1a1a22;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      color: #888;
+    }
+    .ctrl input[type=range] { width: 100px; accent-color: #667eea; }
+    .ctrl select {
+      background: #141420;
+      border: 1px solid #222;
+      color: #ccc;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .ctrl .v { color: #a855f7; font-weight: 600; min-width: 24px; text-align: right; }
+
+    /* Stats pill */
+    .stats {
+      display: flex;
+      gap: 16px;
+      margin-top: 12px;
+      font-size: 11px;
+      color: #444;
+    }
+    .stats b { color: #667eea; }
+
+    .divider {
+      max-width: 960px;
+      margin: 0 auto;
+      border: none;
+      border-top: 1px solid #111;
+    }
+  </style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Pretext 排版艺术</h1>
+  <p>学习官方 Demo 源码后，实现的高级排版效果</p>
+  <div class="tags">
+    <span class="tag">carveTextLineSlots 区间切割</span>
+    <span class="tag">circleIntervalForBand 圆形碰撞</span>
+    <span class="tag">binarySearch 收缩包裹</span>
+    <span class="tag">layoutNextLine 逐行路由</span>
+  </div>
+</div>
+
+<!-- ============ Demo 1: 杂志双栏 + 圆形障碍物 ============ -->
+<div class="section">
+  <div class="section-title">📰 杂志双栏排版</div>
+  <div class="section-desc">Editorial Engine — 文本在双栏间连续流动，自动避开圆形障碍物。灵感来自官方 editorial-engine demo。</div>
+
+  <div class="ctrl-bar">
+    <div class="ctrl">障碍物 <input type="range" id="orbCount" min="0" max="5" value="3"> <span class="v" id="orbCountV">3</span></div>
+    <div class="ctrl">栏间距 <input type="range" id="gutter" min="20" max="80" value="48"> <span class="v" id="gutterV">48</span></div>
+    <div class="ctrl">字号 <input type="range" id="fontSize" min="12" max="22" value="16"> <span class="v" id="fontSizeV">16</span></div>
+  </div>
+
+  <div class="canvas-wrap"><canvas id="editorial"></canvas></div>
+  <div class="stats">
+    <span>排版耗时 <b id="e1Time">-</b></span>
+    <span>总行数 <b id="e1Lines">-</b></span>
+    <span>左栏 <b id="e1Left">-</b> 行</span>
+    <span>右栏 <b id="e1Right">-</b> 行</span>
+    <span>避障行 <b id="e1Wrap">-</b></span>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ============ Demo 2: 聊天气泡收缩包裹 ============ -->
+<div class="section">
+  <div class="section-title">💬 聊天气泡精确包裹</div>
+  <div class="section-desc">Bubble Shrinkwrap — 用 walkLineRanges + 二分搜索找到每条消息的最紧凑宽度。灵感来自官方 bubbles demo。</div>
+
+  <div class="ctrl-bar">
+    <div class="ctrl">容器宽度 <input type="range" id="chatWidth" min="200" max="600" value="420"> <span class="v" id="chatWidthV">420</span></div>
+  </div>
+
+  <div class="canvas-wrap"><canvas id="bubbles"></canvas></div>
+  <div class="stats">
+    <span>排版耗时 <b id="b1Time">-</b></span>
+    <span>CSS 浪费 <b id="b1Waste">-</b> px²</span>
+    <span>收缩后 <b id="b1Tight">-</b> px²</span>
+    <span>节省 <b id="b1Save">-</b></span>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ============ Demo 3: 形状环绕（多障碍物） ============ -->
+<div class="section">
+  <div class="section-title">🌀 多形状环绕排版</div>
+  <div class="section-desc">Dynamic Layout — 多个矩形和圆形障碍物，用 carveTextLineSlots 切割可用区间。灵感来自官方 dynamic-layout + wrap-geometry。</div>
+
+  <div class="ctrl-bar">
+    <div class="ctrl">障碍物数 <input type="range" id="obsCount" min="1" max="6" value="3"> <span class="v" id="obsCountV">3</span></div>
+    <div class="ctrl">内边距 <input type="range" id="obsPad" min="4" max="24" value="10"> <span class="v" id="obsPadV">10</span></div>
+  </div>
+
+  <div class="canvas-wrap"><canvas id="shapes"></canvas></div>
+  <div class="stats">
+    <span>排版耗时 <b id="s1Time">-</b></span>
+    <span>总行数 <b id="s1Lines">-</b></span>
+    <span>区间切割次数 <b id="s1Carves">-</b></span>
+  </div>
+</div>
+
+<script type="module">
+import {
+  prepare, prepareWithSegments, layout, layoutNextLine, layoutWithLines, walkLineRanges
+} from 'https://esm.sh/@chenglou/pretext'
+
+// ==========================================
+// 核心算法：来自官方 wrap-geometry.ts
+// ==========================================
+
+// 区间切割：给定基础可用区间和被占用的区间列表，返回剩余可用槽位
+function carveTextLineSlots(base, blocked, minSlotWidth = 30) {
+  let slots = [{ left: base.left, right: base.right }]
+  for (const b of blocked) {
+    const next = []
+    for (const s of slots) {
+      if (b.right <= s.left || b.left >= s.right) {
+        next.push(s)
+        continue
+      }
+      // 有交集 → 切割
+      if (b.left > s.left) next.push({ left: s.left, right: b.left })
+      if (b.right < s.right) next.push({ left: b.right, right: s.right })
+    }
+    slots = next
+  }
+  return slots.filter(s => s.right - s.left >= minSlotWidth)
+}
+
+// 圆形在某个 y 波段内的占用区间
+function circleIntervalForBand(cx, cy, r, bandTop, bandBottom, hPad, vPad) {
+  const top = bandTop - vPad
+  const bottom = bandBottom + vPad
+  if (top >= cy + r || bottom <= cy - r) return null
+  const minDy = (cy >= top && cy <= bottom) ? 0 : (cy < top ? top - cy : cy - bottom)
+  if (minDy >= r) return null
+  const maxDx = Math.sqrt(r * r - minDy * minDy)
+  return { left: cx - maxDx - hPad, right: cx + maxDx + hPad }
+}
+
+// 矩形在某个 y 波段内的占用区间
+function rectIntervalForBand(rect, bandTop, bandBottom, hPad, vPad) {
+  if (bandBottom <= rect.y - vPad || bandTop >= rect.y + rect.h + vPad) return null
+  return { left: rect.x - hPad, right: rect.x + rect.w + hPad }
+}
+
+// ==========================================
+// Demo 1: 杂志双栏 + 圆形障碍物
+// ==========================================
+const editorialText = `Pretext 是一个革命性的文本排版引擎，由 Midjourney 前端工程师 Cheng Lou 创建。它用纯 TypeScript 在用户态实现了一套高精度的文本测量系统，完全绕过了浏览器的 DOM Reflow 机制。核心突破在于发现浏览器的 canvas.measureText() 和 DOM 渲染底层使用同一套字体引擎，但 canvas 完全在布局树之外运行，量多少次字都不会触发 Reflow。Pretext 先用 canvas 把每个文字片段量一遍并缓存宽度，之后不管怎么拉伸窗口、切换布局，排版计算全是加减乘除。在 Chrome 上 layout() 耗时仅 0.09 毫秒，比传统 DOM 测量快 483 倍；Safari 上更是快了超 1242 倍。7680 项穷举测试，三大浏览器全部像素级吻合。除了性能，Pretext 还解锁了许多此前在 Web 上被认为不可能的排版能力：文字围绕任意形状自由流动、多行文本收缩包裹、动态响应式多栏杂志布局、聊天气泡自适应宽度。这些曾经是 CSS 的噩梦，如今在 Pretext 面前都不值一提。Cheng Lou 是 React Motion 的创造者、ReasonML 和 ReScript 语言的缔造者、Facebook Messenger 前端的核心架构师。这个只有 15KB 的引擎，预示着网页 UI 将从 CSS 束缚中解脱，迈向更具想象力的 Canvas 和 GPU 渲染时代。可验证软件的成本将趋向于零。`
+
+function renderEditorial() {
+  const canvas = document.getElementById('editorial')
+  const ctx = canvas.getContext('2d')
+  const CW = 920, PAD = 28, LINE_H = 24
+  const orbCount = +document.getElementById('orbCount').value
+  const gutterW = +document.getElementById('gutter').value
+  const fontSize = +document.getElementById('fontSize').value
+  const FONT = `${fontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`
+
+  const t0 = performance.now()
+
+  const colW = (CW - PAD * 2 - gutterW) / 2
+  const col1X = PAD
+  const col2X = PAD + colW + gutterW
+
+  // 生成圆形障碍物
+  const orbs = []
+  const orbColors = ['#667eea', '#a855f7', '#ec4899', '#f59e0b', '#10b981']
+  for (let i = 0; i < orbCount; i++) {
+    orbs.push({
+      colIdx: i % 2,
+      cx: (i % 2 === 0 ? col1X : col2X) + colW * (0.3 + Math.random() * 0.4),
+      cy: 80 + i * 100 + Math.random() * 40,
+      r: 30 + Math.random() * 25,
+      color: orbColors[i % 5]
+    })
+  }
+
+  const prepared = prepareWithSegments(editorialText, FONT)
+  let cursor = { segmentIndex: 0, graphemeIndex: 0 }
+  const allLines = []
+  let leftLines = 0, rightLines = 0, wrapLines = 0
+  let curY = PAD
+  const HPAD = 8, VPAD = 4
+
+  // 阶段1: 左栏
+  let colDone = false
+  const leftOrbs = orbs.filter(o => o.colIdx === 0)
+  const rightOrbs = orbs.filter(o => o.colIdx === 1)
+
+  while (cursor) {
+    const bandTop = curY
+    const bandBottom = curY + LINE_H
+    const base = { left: col1X, right: col1X + colW }
+
+    // 收集本行被障碍物占用的区间
+    const blocked = []
+    for (const orb of leftOrbs) {
+      const interval = circleIntervalForBand(orb.cx, orb.cy, orb.r, bandTop, bandBottom, HPAD, VPAD)
+      if (interval) blocked.push(interval)
+    }
+
+    const slots = carveTextLineSlots(base, blocked, 40)
+    if (slots.length === 0) { curY += LINE_H; continue }
+
+    // 用最宽的 slot 排版
+    const slot = slots.reduce((a, b) => (b.right - b.left) > (a.right - a.left) ? b : a)
+    const line = layoutNextLine(prepared, cursor, slot.right - slot.left)
+    if (!line) break
+
+    allLines.push({ text: line.text, x: slot.left, y: curY, side: 'left', wrapped: blocked.length > 0 })
+    cursor = line.end
+    curY += LINE_H
+    leftLines++
+    if (blocked.length > 0) wrapLines++
+
+    // 左栏填满一定高度后切换到右栏（简单策略：左栏用完一半文本量）
+    if (curY > 700 || !cursor) { colDone = true; break }
+  }
+
+  // 阶段2: 右栏（接续 cursor）
+  curY = PAD
+  while (cursor) {
+    const bandTop = curY
+    const bandBottom = curY + LINE_H
+    const base = { left: col2X, right: col2X + colW }
+
+    const blocked = []
+    for (const orb of rightOrbs) {
+      const interval = circleIntervalForBand(orb.cx, orb.cy, orb.r, bandTop, bandBottom, HPAD, VPAD)
+      if (interval) blocked.push(interval)
+    }
+
+    const slots = carveTextLineSlots(base, blocked, 40)
+    if (slots.length === 0) { curY += LINE_H; continue }
+
+    const slot = slots.reduce((a, b) => (b.right - b.left) > (a.right - a.left) ? b : a)
+    const line = layoutNextLine(prepared, cursor, slot.right - slot.left)
+    if (!line) break
+
+    allLines.push({ text: line.text, x: slot.left, y: curY, side: 'right', wrapped: blocked.length > 0 })
+    cursor = line.end
+    curY += LINE_H
+    rightLines++
+    if (blocked.length > 0) wrapLines++
+  }
+
+  // 渲染
+  const maxH = Math.max(...allLines.map(l => l.y + LINE_H)) + PAD
+  canvas.width = CW
+  canvas.height = maxH + 20
+
+  ctx.fillStyle = '#0c0c10'
+  ctx.fillRect(0, 0, CW, canvas.height)
+
+  // 栏背景
+  ctx.fillStyle = '#0f0f15'
+  ctx.fillRect(col1X - 4, 0, colW + 8, canvas.height)
+  ctx.fillRect(col2X - 4, 0, colW + 8, canvas.height)
+
+  // 栏分隔线
+  ctx.strokeStyle = '#1a1a28'
+  ctx.lineWidth = 1
+  ctx.setLineDash([4, 8])
+  ctx.beginPath()
+  ctx.moveTo(col1X + colW + gutterW / 2, 0)
+  ctx.lineTo(col1X + colW + gutterW / 2, canvas.height)
+  ctx.stroke()
+  ctx.setLineDash([])
+
+  // 画障碍物
+  for (const orb of orbs) {
+    ctx.beginPath()
+    ctx.arc(orb.cx, orb.cy, orb.r, 0, Math.PI * 2)
+    const g = ctx.createRadialGradient(orb.cx, orb.cy, 0, orb.cx, orb.cy, orb.r)
+    g.addColorStop(0, orb.color + '40')
+    g.addColorStop(1, orb.color + '10')
+    ctx.fillStyle = g
+    ctx.fill()
+    ctx.strokeStyle = orb.color + '60'
+    ctx.lineWidth = 1.5
+    ctx.stroke()
+  }
+
+  // 画文本
+  ctx.font = FONT
+  for (const line of allLines) {
+    ctx.fillStyle = line.side === 'left' ? '#c8c8ff' : '#c8ffc8'
+    if (line.wrapped) ctx.fillStyle = line.side === 'left' ? '#a0a0ff' : '#a0ffa0'
+    ctx.fillText(line.text, line.x, line.y + LINE_H - 6)
+  }
+
+  const elapsed = (performance.now() - t0).toFixed(2)
+  document.getElementById('e1Time').textContent = elapsed + 'ms'
+  document.getElementById('e1Lines').textContent = allLines.length
+  document.getElementById('e1Left').textContent = leftLines
+  document.getElementById('e1Right').textContent = rightLines
+  document.getElementById('e1Wrap').textContent = wrapLines
+}
+
+// ==========================================
+// Demo 2: 聊天气泡收缩包裹
+// ==========================================
+const chatMessages = [
+  { from: 'other', text: '你好！最近在研究什么新技术？' },
+  { from: 'me', text: '在研究 Pretext，一个文本排版引擎，只有 15KB 但性能超强' },
+  { from: 'other', text: '听起来不错，能做什么？' },
+  { from: 'me', text: '文字环绕任意形状、聊天气泡自适应宽度、杂志双栏排版，而且不触发 DOM Reflow，速度比传统方式快几百倍' },
+  { from: 'other', text: '👍' },
+  { from: 'me', text: '它用 canvas.measureText() 替代 DOM 测量，7680 项测试全部像素级吻合，Safari 上快了 1242 倍。还支持中文、阿拉伯语、Emoji。' },
+  { from: 'other', text: '太强了！我也要试试！' },
+  { from: 'me', text: 'OK' },
+]
+
+function renderBubbles() {
+  const canvas = document.getElementById('bubbles')
+  const ctx = canvas.getContext('2d')
+  const maxW = +document.getElementById('chatWidth').value
+  const FONT = '14px "Helvetica Neue", Helvetica, Arial, sans-serif'
+  const LINE_H = 20
+  const PAD_H = 12, PAD_V = 8
+  const BUBBLE_RATIO = 0.75
+
+  const t0 = performance.now()
+  const CW = 640
+  const bubbleMaxW = Math.floor(maxW * BUBBLE_RATIO)
+  const contentMaxW = bubbleMaxW - PAD_H * 2
+
+  // 准备所有气泡
+  const prepared = chatMessages.map(m => ({
+    ...m,
+    prepared: prepareWithSegments(m.text, FONT)
+  }))
+
+  // 计算每个气泡的 CSS 宽度 vs 紧凑宽度
+  let totalCssWaste = 0, totalTightArea = 0
+  const bubbleData = prepared.map(b => {
+    // CSS 方式：固定 max-width，取最宽行
+    let cssMaxLineW = 0
+    walkLineRanges(b.prepared, contentMaxW, line => {
+      if (line.width > cssMaxLineW) cssMaxLineW = line.width
+    })
+    const { lineCount: cssLC, height: cssH } = layout(b.prepared, contentMaxW, LINE_H)
+    const cssBubbleW = Math.ceil(cssMaxLineW) + PAD_H * 2
+
+    // 紧凑方式：二分搜索找到不换新行的最小宽度
+    let lo = 1, hi = Math.ceil(contentMaxW)
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2)
+      const midLC = layout(b.prepared, mid, LINE_H).lineCount
+      if (midLC <= cssLC) hi = mid
+      else lo = mid + 1
+    }
+    let tightMaxLineW = 0
+    walkLineRanges(b.prepared, lo, line => {
+      if (line.width > tightMaxLineW) tightMaxLineW = line.width
+    })
+    const tightBubbleW = Math.ceil(tightMaxLineW) + PAD_H * 2
+    const { lines } = layoutWithLines(b.prepared, lo, LINE_H)
+    const bubbleH = lines.length * LINE_H + PAD_V * 2
+
+    const cssArea = cssBubbleW * bubbleH
+    const tightArea = tightBubbleW * bubbleH
+    totalCssWaste += (cssBubbleW - tightBubbleW) * bubbleH
+    totalTightArea += tightArea
+
+    return {
+      ...b,
+      lines,
+      tightWidth: tightBubbleW,
+      cssWidth: cssBubbleW,
+      height: bubbleH,
+      wasted: cssBubbleW - tightBubbleW
+    }
+  })
+
+  // 渲染
+  let curY = 16
+  const renderLines = []
+  for (const b of bubbleData) {
+    renderLines.push(b)
+    curY += b.height + 8
+  }
+
+  canvas.width = CW
+  canvas.height = curY + 16
+  ctx.fillStyle = '#0c0c10'
+  ctx.fillRect(0, 0, CW, canvas.height)
+
+  curY = 16
+  for (const b of renderLines) {
+    const isMe = b.from === 'me'
+    const bx = isMe ? CW - b.tightWidth - 16 : 16
+
+    // 气泡背景
+    ctx.fillStyle = isMe ? '#1a2a1a' : '#1a1a2a'
+    ctx.beginPath()
+    ctx.roundRect(bx, curY, b.tightWidth, b.height, 10)
+    ctx.fill()
+
+    // 紧凑宽度边框（实线）
+    ctx.strokeStyle = isMe ? '#2a4a2a' : '#2a2a4a'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.roundRect(bx, curY, b.tightWidth, b.height, 10)
+    ctx.stroke()
+
+    // CSS 宽度对比（虚线，如果有浪费）
+    if (b.wasted > 2) {
+      ctx.setLineDash([3, 3])
+      ctx.strokeStyle = '#ff444440'
+      ctx.beginPath()
+      const cssX = isMe ? CW - b.cssWidth - 16 : 16
+      ctx.roundRect(cssX, curY, b.cssWidth, b.height, 10)
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      // 浪费面积标注
+      ctx.font = '10px monospace'
+      ctx.fillStyle = '#ff6666'
+      const label = `-${b.wasted}px`
+      if (isMe) ctx.fillText(label, CW - b.cssWidth - 16 - 36, curY + b.height / 2 + 3)
+      else ctx.fillText(label, 16 + b.cssWidth + 6, curY + b.height / 2 + 3)
+    }
+
+    // 文字
+    ctx.font = FONT
+    ctx.fillStyle = '#ddd'
+    b.lines.forEach((line, i) => {
+      ctx.fillText(line.text, bx + PAD_H, curY + PAD_V + (i + 1) * LINE_H - 5)
+    })
+
+    curY += b.height + 8
+  }
+
+  const elapsed = (performance.now() - t0).toFixed(2)
+  const savePercent = totalCssWaste > 0 ? ((totalCssWaste / (totalTightArea + totalCssWaste)) * 100).toFixed(1) : '0'
+  document.getElementById('b1Time').textContent = elapsed + 'ms'
+  document.getElementById('b1Waste').textContent = Math.round(totalCssWaste).toLocaleString()
+  document.getElementById('b1Tight').textContent = Math.round(totalTightArea).toLocaleString()
+  document.getElementById('b1Save').textContent = savePercent + '%'
+}
+
+// ==========================================
+// Demo 3: 多形状环绕
+// ==========================================
+const shapeText = `Web 排版三十年的枷锁终于被打破。Pretext 这个只有 15KB 的引擎，用纯 TypeScript 实现了此前被认为不可能的排版效果。文字可以围绕任意形状自由流动，无论是矩形、圆形还是不规则多边形，都不在话下。核心算法 carveTextLineSlots 将可用空间切割成多个连续的区间，然后选择最宽的区间进行排版。circleIntervalForBand 计算圆形在每个水平波段的占用范围，结合勾股定理精确到像素。这一切都是纯数学运算，零 DOM 开销，速度比传统方式快数百倍。Cheng Lou 用一个巧妙的发现撬动了整个前端排版生态：canvas.measureText 和 DOM 渲染共享同一套字体引擎，但 canvas 永远不会触发 Reflow。这个发现意味着开发者可以完全在用户态掌控文本排版，无需等待 CSS 委员会的下一次讨论。杂志式的多栏排版、聊天气泡的精确包裹、任意形状的文字环绕——这些曾经在 CSS 中是噩梦般的需求，现在只需几行代码就能实现。`
+
+function renderShapes() {
+  const canvas = document.getElementById('shapes')
+  const ctx = canvas.getContext('2d')
+  const CW = 920, PAD = 28, LINE_H = 22
+  const obsCount = +document.getElementById('obsCount').value
+  const obsPad = +document.getElementById('obsPad').value
+  const FONT = '14.5px "Helvetica Neue", Helvetica, Arial, sans-serif'
+
+  const t0 = performance.now()
+  const contentW = CW - PAD * 2
+
+  // 生成混合障碍物
+  const obstacles = []
+  const shapes = []
+  for (let i = 0; i < obsCount; i++) {
+    if (i % 2 === 0) {
+      // 矩形
+      const w = 80 + Math.random() * 100
+      const h = 60 + Math.random() * 80
+      const x = PAD + 60 + Math.random() * (contentW - w - 120)
+      const y = 40 + i * 70 + Math.random() * 30
+      obstacles.push({ type: 'rect', x, y, w, h })
+      shapes.push({ type: 'rect', x, y, w, h, color: `hsl(${i * 72}, 60%, 30%)` })
+    } else {
+      // 圆形
+      const r = 30 + Math.random() * 30
+      const cx = PAD + 80 + Math.random() * (contentW - 160)
+      const cy = 60 + i * 70 + Math.random() * 30
+      obstacles.push({ type: 'circle', cx, cy, r })
+      shapes.push({ type: 'circle', cx, cy, r, color: `hsl(${i * 72}, 60%, 30%)` })
+    }
+  }
+
+  const prepared = prepareWithSegments(shapeText, FONT)
+  let cursor = { segmentIndex: 0, graphemeIndex: 0 }
+  const allLines = []
+  let curY = PAD
+  let carves = 0
+
+  while (cursor) {
+    const bandTop = curY
+    const bandBottom = curY + LINE_H
+    const base = { left: PAD, right: CW - PAD }
+
+    // 收集被占用的区间
+    const blocked = []
+    for (const obs of obstacles) {
+      if (obs.type === 'circle') {
+        const interval = circleIntervalForBand(obs.cx, obs.cy, obs.r, bandTop, bandBottom, obsPad, obsPad)
+        if (interval) blocked.push(interval)
+      } else {
+        const interval = rectIntervalForBand(obs, bandTop, bandBottom, obsPad, obsPad)
+        if (interval) blocked.push(interval)
+      }
+    }
+
+    carves++
+    const slots = carveTextLineSlots(base, blocked, 40)
+    if (slots.length === 0) { curY += LINE_H; continue }
+
+    // 选最宽 slot
+    const slot = slots.reduce((a, b) => (b.right - b.left) > (a.right - a.left) ? b : a)
+    const line = layoutNextLine(prepared, cursor, slot.right - slot.left)
+    if (!line) break
+
+    allLines.push({
+      text: line.text,
+      x: slot.left,
+      y: curY,
+      width: line.width,
+      slotWidth: slot.right - slot.left,
+      wrapped: blocked.length > 0,
+      blocked
+    })
+    cursor = line.end
+    curY += LINE_H
+  }
+
+  // 渲染
+  canvas.width = CW
+  canvas.height = curY + PAD
+  ctx.fillStyle = '#0c0c10'
+  ctx.fillRect(0, 0, CW, canvas.height)
+
+  // 画障碍物
+  for (const s of shapes) {
+    if (s.type === 'rect') {
+      ctx.fillStyle = s.color + '60'
+      ctx.strokeStyle = s.color
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.roundRect(s.x, s.y, s.w, s.h, 6)
+      ctx.fill()
+      ctx.stroke()
+    } else {
+      ctx.beginPath()
+      ctx.arc(s.cx, s.cy, s.r, 0, Math.PI * 2)
+      const g = ctx.createRadialGradient(s.cx, s.cy, 0, s.cx, s.cy, s.r)
+      g.addColorStop(0, s.color + '80')
+      g.addColorStop(1, s.color + '20')
+      ctx.fillStyle = g
+      ctx.fill()
+      ctx.strokeStyle = s.color
+      ctx.lineWidth = 2
+      ctx.stroke()
+    }
+  }
+
+  // 画文本
+  ctx.font = FONT
+  for (const line of allLines) {
+    // 环绕行用不同颜色
+    ctx.fillStyle = line.wrapped ? '#b0b0ff' : '#c0c0c0'
+    ctx.fillText(line.text, line.x, line.y + LINE_H - 5)
+
+    // 显示 slot 边界
+    if (line.wrapped && line.blocked.length > 0) {
+      ctx.setLineDash([1, 3])
+      ctx.strokeStyle = 'rgba(102, 126, 234, 0.08)'
+      ctx.lineWidth = 0.5
+      ctx.beginPath()
+      ctx.moveTo(line.x, line.y)
+      ctx.lineTo(line.x + line.slotWidth, line.y)
+      ctx.stroke()
+      ctx.setLineDash([])
+    }
+  }
+
+  const elapsed = (performance.now() - t0).toFixed(2)
+  document.getElementById('s1Time').textContent = elapsed + 'ms'
+  document.getElementById('s1Lines').textContent = allLines.length
+  document.getElementById('s1Carves').textContent = carves
+}
+
+// ==========================================
+// Bind controls
+// ==========================================
+function bind(id, fn) {
+  const el = document.getElementById(id)
+  const valEl = document.getElementById(id + 'V')
+  el.addEventListener('input', () => { valEl.textContent = el.value; fn() })
+}
+
+bind('orbCount', renderEditorial)
+bind('gutter', renderEditorial)
+bind('fontSize', renderEditorial)
+bind('chatWidth', renderBubbles)
+bind('obsCount', renderShapes)
+bind('obsPad', renderShapes)
+
+// Initial render
+renderEditorial()
+renderBubbles()
+renderShapes()
+</script>
+</body>
+</html>

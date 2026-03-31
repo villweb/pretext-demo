@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pretext Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    h1 {
+      text-align: center;
+      font-size: 32px;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .subtitle {
+      text-align: center;
+      color: #888;
+      margin-bottom: 40px;
+      font-size: 14px;
+    }
+
+    /* Stats bar */
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+    }
+    .stat {
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      color: #667eea;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    /* Demo sections */
+    .demo-grid {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 24px;
+    }
+    .demo-card {
+      background: #141414;
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 24px;
+      transition: border-color 0.3s;
+    }
+    .demo-card:hover {
+      border-color: #667eea;
+    }
+    .demo-card h2 {
+      font-size: 16px;
+      margin-bottom: 4px;
+      color: #fff;
+    }
+    .demo-card p {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 16px;
+    }
+    .demo-card canvas {
+      width: 100%;
+      border-radius: 8px;
+      background: #1a1a1a;
+    }
+    .demo-card.full-width {
+      grid-column: 1 / -1;
+    }
+
+    /* Benchmark section */
+    .benchmark-bar {
+      height: 24px;
+      border-radius: 4px;
+      margin: 8px 0;
+      display: flex;
+      align-items: center;
+      padding-left: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      transition: width 1s ease;
+    }
+    .bar-pretext {
+      background: linear-gradient(90deg, #667eea, #764ba2);
+    }
+    .bar-dom {
+      background: linear-gradient(90deg, #e74c3c, #c0392b);
+    }
+    .bench-label {
+      font-size: 12px;
+      color: #888;
+      margin-top: 4px;
+    }
+
+    /* Input area */
+    .input-area {
+      max-width: 1200px;
+      margin: 40px auto 0;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .input-area textarea {
+      flex: 1;
+      background: #141414;
+      border: 1px solid #222;
+      border-radius: 8px;
+      color: #e0e0e0;
+      padding: 12px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+      min-height: 80px;
+    }
+    .input-area textarea:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    .result-box {
+      min-width: 200px;
+      background: #141414;
+      border: 1px solid #222;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .result-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+    .result-item:last-child { margin-bottom: 0; }
+    .result-key { color: #888; }
+    .result-value { color: #667eea; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<h1>Pretext Demo</h1>
+<p class="subtitle">15KB 文本排版引擎 · 零 DOM Reflow · 120fps</p>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-value" id="statPrepare">-</div>
+    <div class="stat-label">prepare() 耗时</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" id="statLayout">-</div>
+    <div class="stat-label">layout() 耗时</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value" id="statSpeedup">-</div>
+    <div class="stat-label">比 DOM 快</div>
+  </div>
+</div>
+
+<div class="demo-grid">
+
+  <!-- Demo 1: Canvas 多行文本渲染 -->
+  <div class="demo-card">
+    <h2>📝 Canvas 多行文本渲染</h2>
+    <p>layoutWithLines() 逐行渲染到 Canvas</p>
+    <canvas id="canvas1" width="680" height="300"></canvas>
+  </div>
+
+  <!-- Demo 2: 文字环绕 -->
+  <div class="demo-card">
+    <h2>🔄 文字环绕排版</h2>
+    <p>layoutNextLine() 文字绕过障碍物流动</p>
+    <canvas id="canvas2" width="680" height="300"></canvas>
+  </div>
+
+  <!-- Demo 3: 实时测量 -->
+  <div class="demo-card">
+    <h2>📏 实时文本测量</h2>
+    <p>输入文字，实时计算高度和行数</p>
+    <canvas id="canvas3" width="680" height="300"></canvas>
+  </div>
+
+  <!-- Demo 4: 收缩包裹 -->
+  <div class="demo-card">
+    <h2>📦 多行收缩包裹</h2>
+    <p>walkLineRanges() 找到最紧凑容器宽度</p>
+    <canvas id="canvas4" width="680" height="300"></canvas>
+  </div>
+
+  <!-- Benchmark -->
+  <div class="demo-card full-width">
+    <h2>⚡ 性能对比：Pretext vs DOM Reflow</h2>
+    <p>测量 500 条文本的排版耗时</p>
+    <div id="benchmarkArea"></div>
+  </div>
+
+</div>
+
+<!-- 互动输入区 -->
+<div class="input-area">
+  <textarea id="userInput" placeholder="在这里输入任意文字，试试 Pretext 的实时测量能力...">Pretext 是一个只有 15KB 的文本排版引擎，用纯 TypeScript 实现。它抛弃了 DOM 测量，用 canvas.measureText() 做文本测量，性能比传统方式快数百倍。支持中文、阿拉伯语、Emoji、双向文本，可以在 Canvas、SVG、WebGL 中使用。</textarea>
+  <div class="result-box">
+    <div class="result-item">
+      <span class="result-key">测量耗时</span>
+      <span class="result-value" id="rTime">-</span>
+    </div>
+    <div class="result-item">
+      <span class="result-key">文本高度</span>
+      <span class="result-value" id="rHeight">-</span>
+    </div>
+    <div class="result-item">
+      <span class="result-key">行数</span>
+      <span class="result-value" id="rLines">-</span>
+    </div>
+    <div class="result-item">
+      <span class="result-key">最宽行</span>
+      <span class="result-value" id="rMaxW">-</span>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { prepare, prepareWithSegments, layout, layoutWithLines, layoutNextLine, walkLineRanges } from 'https://esm.sh/@chenglou/pretext'
+
+  const FONT = '14px Inter, -apple-system, sans-serif'
+  const LINE_HEIGHT = 22
+  const PAD = 16
+
+  // ===== Demo 1: Canvas 多行文本渲染 =====
+  function demo1() {
+    const canvas = document.getElementById('canvas1')
+    const ctx = canvas.getContext('2d')
+    const W = canvas.width
+    ctx.clearRect(0, 0, W, canvas.height)
+
+    const text = 'Pretext 彻底改变了网页文本排版的方式。它用纯 TypeScript 实现了一个高精度的文本测量引擎，抛弃了传统的 DOM Reflow 机制。在 Chrome 上，它的排版速度比传统 DOM 测量快 483 倍；在 Safari 上更是快了 1242 倍。这一切都源于一个巧妙的发现：浏览器的 canvas.measureText() 和 DOM 渲染使用同一套字体引擎，但 canvas 不会触发 Reflow。🚀'
+
+    const prepared = prepareWithSegments(text, FONT)
+    const { height, lines } = layoutWithLines(prepared, W - PAD * 2, LINE_HEIGHT)
+
+    canvas.height = Math.max(150, height + PAD * 2)
+    ctx.fillStyle = '#1a1a1a'
+    ctx.fillRect(0, 0, W, canvas.height)
+
+    ctx.font = FONT
+    ctx.fillStyle = '#e0e0e0'
+
+    lines.forEach((line, i) => {
+      ctx.fillText(line.text, PAD, PAD + (i + 1) * LINE_HEIGHT - 5)
+    })
+
+    // 高亮第一行
+    ctx.fillStyle = 'rgba(102, 126, 234, 0.08)'
+    ctx.fillRect(0, PAD, W, LINE_HEIGHT)
+  }
+
+  // ===== Demo 2: 文字环绕 =====
+  function demo2() {
+    const canvas = document.getElementById('canvas2')
+    const ctx = canvas.getContext('2d')
+    const W = canvas.width
+    const H = 300
+    canvas.height = H
+    ctx.clearRect(0, 0, W, H)
+
+    ctx.fillStyle = '#1a1a1a'
+    ctx.fillRect(0, 0, W, H)
+
+    const text = '文字环绕排版是 CSS 困扰了前端开发者三十年的难题之一。Pretext 通过 layoutNextLine() 方法让文字可以绕过任意形状的障碍物自由流动。每一行的宽度都可以不同，完全由开发者控制。这意味着你可以实现杂志级的排版效果：文字围绕图片流动、多栏自适应布局、不规则区域文本填充。再也不需要 CSS float 的各种 hack 了。这一切都是纯数学计算，零 DOM 开销。'
+
+    const prepared = prepareWithSegments(text, FONT)
+
+    // 画一个"障碍物"（模拟浮动图片）
+    const block = { x: 180, y: 30, w: 160, h: 120 }
+    ctx.fillStyle = '#252545'
+    ctx.strokeStyle = '#667eea'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.roundRect(block.x, block.y, block.w, block.h, 8)
+    ctx.fill()
+    ctx.stroke()
+
+    ctx.font = 'bold 13px Inter, sans-serif'
+    ctx.fillStyle = '#667eea'
+    ctx.textAlign = 'center'
+    ctx.fillText('图片区域', block.x + block.w / 2, block.y + block.h / 2 + 5)
+    ctx.textAlign = 'left'
+
+    // 逐行排版，绕过障碍物
+    ctx.font = FONT
+    ctx.fillStyle = '#c0c0c0'
+
+    let cursor = { segmentIndex: 0, graphemeIndex: 0 }
+    let y = PAD
+    const maxX = W - PAD
+
+    while (cursor && y < H - PAD) {
+      // 计算当前行可用宽度
+      let lineStart = PAD
+      let lineEnd = maxX
+
+      if (y >= block.y && y < block.y + block.h) {
+        // 这一行的 y 在障碍物范围内 → 缩小可用宽度
+        lineEnd = block.x - 8
+      }
+
+      const availWidth = lineEnd - lineStart
+      if (availWidth < 50) {
+        y += LINE_HEIGHT
+        continue
+      }
+
+      const line = layoutNextLine(prepared, cursor, availWidth)
+      if (!line) break
+
+      ctx.fillText(line.text, lineStart, y + LINE_HEIGHT - 5)
+      cursor = line.end
+      y += LINE_HEIGHT
+    }
+  }
+
+  // ===== Demo 3: 实时测量 =====
+  function demo3() {
+    const canvas = document.getElementById('canvas3')
+    const ctx = canvas.getContext('2d')
+    const W = canvas.width
+    ctx.clearRect(0, 0, W, canvas.height)
+
+    const samples = [
+      { text: '短文本', width: 640 },
+      { text: '这是一段中等长度的文本，用来展示 Pretext 的自动换行能力。', width: 640 },
+      { text: 'Pretext 支持中文、English、日本語、한국어、العربية 🌍 多语言混合排版，而且精度像素级吻合。', width: 300 },
+    ]
+
+    let totalH = PAD
+    const results = []
+
+    samples.forEach(s => {
+      const p = prepareWithSegments(s.text, FONT)
+      const { height, lineCount } = layout(p, s.width - PAD * 2, LINE_HEIGHT)
+      results.push({ ...s, height, lineCount, prepared: p })
+      totalH += height + 40
+    })
+
+    canvas.height = Math.max(200, totalH + PAD)
+    ctx.fillStyle = '#1a1a1a'
+    ctx.fillRect(0, 0, W, canvas.height)
+
+    let y = PAD
+    results.forEach(r => {
+      // 画容器边框
+      ctx.strokeStyle = '#333'
+      ctx.lineWidth = 1
+      ctx.setLineDash([4, 4])
+      ctx.strokeRect(PAD, y, r.width - PAD * 2, r.height)
+      ctx.setLineDash([])
+
+      // 画文本
+      ctx.font = FONT
+      ctx.fillStyle = '#e0e0e0'
+      const { lines } = layoutWithLines(r.prepared, r.width - PAD * 2, LINE_HEIGHT)
+      lines.forEach((line, i) => {
+        ctx.fillText(line.text, PAD + 4, y + (i + 1) * LINE_HEIGHT - 5)
+      })
+
+      // 标注
+      ctx.font = '11px monospace'
+      ctx.fillStyle = '#667eea'
+      ctx.fillText(`${r.lineCount} 行 · ${r.height.toFixed(1)}px · 宽 ${r.width - PAD * 2}px`, PAD + 4, y + r.height + 14)
+
+      y += r.height + 40
+    })
+  }
+
+  // ===== Demo 4: 收缩包裹 =====
+  function demo4() {
+    const canvas = document.getElementById('canvas4')
+    const ctx = canvas.getContext('2d')
+    const W = canvas.width
+    canvas.height = 300
+    ctx.clearRect(0, 0, W, canvas.height)
+    ctx.fillStyle = '#1a1a1a'
+    ctx.fillRect(0, 0, W, canvas.height)
+
+    const messages = [
+      '好的 👍',
+      'Pretext 真的太棒了！',
+      '这个引擎只有 15KB，却解决了困扰前端 30 年的文本排版问题。性能提升数百倍，精度像素级吻合。',
+    ]
+
+    const chatStartX = 80
+    let y = PAD + 10
+
+    messages.forEach((msg, idx) => {
+      const prepared = prepareWithSegments(msg, FONT)
+      const maxWidth = 360
+
+      // 找到最紧凑宽度
+      let maxW = 0
+      walkLineRanges(prepared, maxWidth, line => {
+        if (line.width > maxW) maxW = line.width
+      })
+
+      const { height, lineCount, lines } = layoutWithLines(prepared, maxWidth, LINE_HEIGHT)
+      const boxW = Math.min(maxW + 24, maxWidth + 24)
+      const boxH = height + 16
+      const isLeft = idx % 2 === 0
+      const bx = isLeft ? chatStartX : W - chatStartX - boxW
+
+      // 气泡背景
+      ctx.fillStyle = isLeft ? '#252545' : '#1a3a1a'
+      ctx.beginPath()
+      ctx.roundRect(bx, y, boxW, boxH, 12)
+      ctx.fill()
+
+      // 文字
+      ctx.font = FONT
+      ctx.fillStyle = '#e0e0e0'
+      lines.forEach((line, i) => {
+        ctx.fillText(line.text, bx + 12, y + 12 + (i + 1) * LINE_HEIGHT - 5)
+      })
+
+      // 标注最紧凑宽度
+      ctx.font = '10px monospace'
+      ctx.fillStyle = '#666'
+      ctx.fillText(`收缩宽度: ${maxW.toFixed(1)}px · ${lineCount}行`, bx, y + boxH + 14)
+
+      y += boxH + 30
+    })
+  }
+
+  // ===== Benchmark =====
+  function runBenchmark() {
+    const benchArea = document.getElementById('benchmarkArea')
+    const texts = Array.from({ length: 500 }, (_, i) =>
+      `这是第 ${i + 1} 条测试文本，用来对比 Pretext 和传统 DOM 测量的性能差异。Pretext 使用 canvas 测量，不触发 Reflow。`
+    )
+    const font = FONT
+
+    // Pretext 测量
+    const t0 = performance.now()
+    const prepared = texts.map(t => prepare(t, font))
+    const t1 = performance.now()
+    prepared.forEach(p => layout(p, 300, LINE_HEIGHT))
+    const t2 = performance.now()
+
+    const pretextPrepare = (t1 - t0).toFixed(2)
+    const pretextLayout = (t2 - t1).toFixed(2)
+    const pretextTotal = (t2 - t0).toFixed(2)
+
+    // DOM 测量
+    const t3 = performance.now()
+    const tempDiv = document.createElement('div')
+    tempDiv.style.cssText = `position:absolute;left:-9999px;width:300px;font:${font};line-height:${LINE_HEIGHT}px;`
+    document.body.appendChild(tempDiv)
+    texts.forEach(t => {
+      tempDiv.textContent = t
+      tempDiv.offsetHeight // force reflow
+    })
+    document.body.removeChild(tempDiv)
+    const t4 = performance.now()
+
+    const domTotal = (t4 - t3).toFixed(2)
+    const speedup = (domTotal / (t2 - t0)).toFixed(0)
+
+    // Update stats
+    document.getElementById('statPrepare').textContent = pretextPrepare + 'ms'
+    document.getElementById('statLayout').textContent = pretextLayout + 'ms'
+    document.getElementById('statSpeedup').textContent = speedup + 'x'
+
+    // Draw bars
+    benchArea.innerHTML = `
+      <div class="bench-label">Pretext (prepare + layout): ${pretextTotal}ms</div>
+      <div class="benchmark-bar bar-pretext" style="width: ${Math.max(3, (pretextTotal / domTotal) * 100)}%">${pretextTotal}ms</div>
+      <div class="bench-label">传统 DOM Reflow: ${domTotal}ms</div>
+      <div class="benchmark-bar bar-dom" style="width: 100%">${domTotal}ms</div>
+    `
+  }
+
+  // ===== 互动输入 =====
+  function handleInput() {
+    const textarea = document.getElementById('userInput')
+    const text = textarea.value
+    if (!text) return
+
+    const prepared = prepareWithSegments(text, FONT)
+    const maxWidth = textarea.offsetWidth - 240
+
+    const t0 = performance.now()
+    const { height, lineCount } = layout(prepared, maxWidth, LINE_HEIGHT)
+    const t1 = performance.now()
+
+    let maxW = 0
+    walkLineRanges(prepared, maxWidth, line => {
+      if (line.width > maxW) maxW = line.width
+    })
+
+    document.getElementById('rTime').textContent = (t1 - t0).toFixed(3) + 'ms'
+    document.getElementById('rHeight').textContent = height.toFixed(1) + 'px'
+    document.getElementById('rLines').textContent = lineCount
+    document.getElementById('rMaxW').textContent = maxW.toFixed(1) + 'px'
+  }
+
+  document.getElementById('userInput').addEventListener('input', handleInput)
+
+  // ===== Run all =====
+  demo1()
+  demo2()
+  demo3()
+  demo4()
+  runBenchmark()
+  handleInput()
+</script>
+
+</body>
+</html>
